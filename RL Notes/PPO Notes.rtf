@@ -1,0 +1,31 @@
+{\rtf1\ansi\ansicpg1252\cocoartf2759
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
+{\colortbl;\red255\green255\blue255;}
+{\*\expandedcolortbl;;}
+\margl1440\margr1440\vieww11520\viewh8400\viewkind0
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f0\fs24 \cf0 === Links ===\
+Hugging face deep rl course\
+\
+=== Advantage Function ===\
+<math> A(s, a) = Q(s, a) - V(s) </math>. Intuitively: extra reward we get if we take action at state compared to the mean reward at that state. We use this advantage function to tell us how good the action is - if its positive, the action is better than others at that state so we want to move in that direction, and if its negative, the action is worse than others at thtat state so we move in the opposite direction. Since it's often difficult and expensive to compute the Q value for all state-action pairs, we replace Q(s, a) with our sampled reward from the action. We can improve policy gradients using this objective function instead of the reward for stability.\
+\
+=== Motivation ===\
+Intuition: Want to avoid too large of a policy update\
+#Smaller policy updates more likely to converge to optimal\
+#Falling "off the cliff" might mean it's impossible to recover\
+How we solve this: Measure how much policy changes w.r.t. previous, clip ratio to <math>[1-\\varepsilon, 1 + \\varepsilon]</math> removing incentive to go too far.\
+\
+=== Ratio Function ===\
+Intuitively, if we want to measure the divergence between our old and current policies, we want some way of figuring out the difference between action-state pairs in the old and new policies. We denote this as <math> r_t(\\theta) = \\frac\{\\pi_\\theta(a_t | s_t)\}\{\\pi_\{\\theta_\{old\}\}(a_t|s_t)\} </math>. A ratio greater than one indicates the action is more likely in the current policy than the old policy, and if its between 0 and 1, it indicates the opposite. This ratio function replaces the log probability in the policy objective function as the way of accounting for the change in parameters. \
+\
+Let's step back for a moment and think about why we might want to do this. In standard policy gradients, after we use a trajectory to update our policy, the experience gained in that trajectory is now incorrect with respect to our current policy. We resolve this using importance sampling. If the actions of the old trajectory have become unlikely, the influence of that experience will be reduced. Thus, prior to clipping, our new loss function can be written in expectation form as <math> E \\left[r_t(\\theta)A_t\\right] </math>. If we take the gradient, it actually ends up being a nearly identical equation, only with the <math> \\pi_\\theta(a_t | s_t) </math> being scaled by a proportional factor <math> \\pi_\{\\theta_\{old\}\}(a_t | s_t) </math>. \
+\
+=== Clipping ===\
+Our clipped objective function is <math> E_t </math>\
+It's easier to understand this clipping when we break it down based on why we are clipping. Let's consider some possible cases:\
+# The ratio is in the range. If the ratio is in the range, we have no reason to clip - if advantage is positive, we should encourage our policy to increase the probability of that action, and if negative, we should decrease the probability that the policy takes the action. \
+# The ratio is lower than <math> 1 - \\epsilon </math>. If the advantage is positive, we still want to increase the probability of taking that action. If the advantage is negative, then doing a policy update will decrease further the probability of taking that action, so we instead clip the gradient to 0 and don't update our weights - even though the reward here was worse, we still want to explore. \
+# The ratio is greater than <math> 1 + \\epsilon </math>. If the advantage is positive, we already have a higher probability of taking the action than in the previous policy. Thus, we don't want to update further, and get to greedy. If the advantage is negative, we clip it to <math> 1 - \\epsilon </math> as usual.\
+}

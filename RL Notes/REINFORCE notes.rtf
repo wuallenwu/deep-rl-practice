@@ -1,0 +1,57 @@
+{\rtf1\ansi\ansicpg1252\cocoartf2759
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
+{\colortbl;\red255\green255\blue255;}
+{\*\expandedcolortbl;;}
+\margl1440\margr1440\vieww11520\viewh8400\viewkind0
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f0\fs24 \cf0 Allen's REINFORCE notes\
+\
+=== Links ===\
+\
+* [http://www.incompleteideas.net/book/RLbook2020.pdf RLbook2020]\
+* [https://samuelebolotta.medium.com/2-deep-reinforcement-learning-policy-gradients-5a416a99700a Deep RL: Policy Gradients]\
+\
+[[Category:Reinforcement Learning]]\
+\
+=== Motivation ===\
+\
+Recall that the objective of Reinforcement Learning is to find an optimal policy <math> \\pi^* </math> which we encode in a neural network with parameters <math>\\theta^*</math>. <math> \\pi_\\theta </math> is a mapping from observations to actions. These optimal parameters are defined as\
+<math>\\theta^* = \\text\{argmax\}_\\theta E_\{\\tau \\sim p_\\theta(\\tau)\} \\left[ \\sum_t r(s_t, a_t) \\right] </math>. Let's unpack what this means. To phrase it in english, this is basically saying that the optimal policy is one such that the expected value of the total reward over following a trajectory (<math> \\tau </math>) determined by the policy is the highest over all policies. \
+\
+=== Overview ===\
+\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\partightenfactor0
+\cf0 <syntaxhighlight lang="bash" >\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+\cf0 Initialize neural network with input dimensions = observation dimensions and output dimensions = action dimensions\
+For each episode:\
+  While not terminated:\
+    Get observation from environment\
+    Use policy network to map observation to action distribution\
+    Randomly sample one action from action distribution\
+    Compute logarithmic probability of that action occurring\
+    Step environment using action and store reward\
+  Calculate loss over entire trajectory as function of probabilities and rewards\
+  Recall loss functions are differentiable with respect to each parameter - thus, calculate how changes in parameters correlate with changes in the loss\
+  Based on the loss, use a gradient descent policy to update weights\
+\
+</syntaxhighlight>\
+\
+=== Objective Function ===\
+\
+The goal of reinforcement learning is to maximize the expected reward over the entire episode. We use <math>R(\\tau)</math> to denote the total reward over some trajectory <math>\\tau</math> defined by our policy. Thus we want to maximize <math>E_\{\\tau \\sim \\pi_\\theta\}[R(\\tau)]</math>. We can use the definition of expected value to expand this as <math>\\sum_\\tau P(\\tau | \\theta) R (\\tau)</math>, where the probability of a given trajectory occurring can further be expressed as <math> P(\\tau | \\theta) = P(s_0) \\prod^T_\{t=0\} \\pi_\\theta(a_t | s_t) P(s_\{t + 1\} | s_t, a_t) </math>. \
+\
+Now we want to find the gradient of <math> J (\\theta) </math>, namely\
+<math>\\nabla_\\theta \\sum_\\tau P(\\tau | \\theta) R(\\tau) </math>. Since the reward function isn't a dependent on the parameters. We can rearrange: <math> \\sum_\\tau R(\\tau) \\nabla_\\theta  P(\\tau | \\theta) </math>. The next step here is what's called the Log Derivative Trick. \
+\
+Suppose we'd like to find <math>\\nabla_\{x_1\}\\log(f(x_1, x_2, x_3, ...))</math>. By the chain rule this is equal to <math>\\frac\{\\nabla_\{x_1\}f(x_1, x_2, x_3 ...)\}\{f(x_1, x_2, x_3 ...)\}</math>. Thus, by rearranging, we can take the gradient of any function with respect to some variable as <math>\\nabla_\{x_1\}f(x_1, x_2, x_3, ...)= f(x_1, x_2, x_3,...)\\nabla_\{x_1\}\\log(f(x_1, x_2, x_3, ...)</math>.\
+\
+Thus, using this idea, we can rewrite our gradient as <math> \\sum_\\tau R(\\tau) p(\\tau | \\theta) \\nabla_\\theta \\log P(\\tau | \\theta) </math>. \
+\
+=== Loss Computation ===\
+\
+It is tricky for us to give our policy the notion of "total" reward and "total" probability. Thus, we desire to change these values parameterized by <math> \\tau </math> to instead be parameterized by t. That is, instead of examining the behavior of the entire episode, we want to create a summation over timesteps. We know that <math> R(\\tau) </math> is the total reward over all timesteps. Thus, we can rewrite the <math> R(\\tau) </math> component at some timestep t as <math> \\gamma^\{T - t\}r_t </math>, where gamma is our discount factor. Further, we recall that the probability of the trajectory occurring given the policy is <math> P(\\tau | \\theta) = P(s_0) \\prod^T_\{t=0\} \\pi_\\theta(a_t | s_t) P(s_\{t + 1\} | s_t, a_t) </math>. Since the probabilities of <math> P(s_0) </math> and <math> P(s_\{t+a\} | s_t, a,t) </math> are determined by the environment and independent of the policy, their gradient is zero. Recognizing this, and further recognizing that multiplication of probabilities in log space is equal to the sum of the logarithm of each of the probabilities, we get our final gradient expression <math> \\sum_\\tau P(\\tau | \\theta) R( \\tau) \\sum_\{t = 0\}^T \\nabla_\\theta \\log \\pi_\\theta (a_t | s_t) </math>.\
+\
+Rewriting this into an expectation, we have <math> \\nabla_\\theta J (\\theta) = E_\{\\tau \\sim \\pi_\\theta\}\\left[R(\\tau)\\sum_\{t = 0\}^T \\nabla_\\theta \\log \\pi_\\theta (a_t | s_t)\\right] </math>. Using the formula for discounted reward, we have our final formula <math> E_\{\\tau \\sim \\pi_\\theta\}\\left[\\sum_\{t = 0\}^T \\nabla_\\theta \\log \\pi_\\theta (a_t | s_t) \\gamma^\{T - t\}r_t \\right] </math>. This is why our loss is equal to <math> -\\sum_\{t = 0\}^T \\log \\pi_\\theta (a_t | s_t) \\gamma^\{T - t\}r_t </math>, since using the chain rule to take its derivative gives us the formula for the gradient for our backwards pass (see Dennis' Optimization Notes).\
+}
